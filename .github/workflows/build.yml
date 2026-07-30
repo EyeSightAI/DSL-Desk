@@ -36,9 +36,17 @@ jobs:
         env:
           VCPKG_ROOT: C:\vcpkg
           LIBCLANG_PATH: "C:\\Program Files\\LLVM\\bin"
+
+      - name: Apply Rust branding
+        run: |
+          (Get-Content libs/hbb_common/src/config.rs -Raw) -replace '"RustDesk"', '"DSL Desk"' | Set-Content libs/hbb_common/src/config.rs
+          (Get-Content src/main.rs -Raw) -replace 'use librustdesk::', 'use libdsldesk::' | Set-Content src/main.rs
+          (Get-Content src/service.rs -Raw) -replace 'use librustdesk::', 'use libdsldesk::' | Set-Content src/service.rs
+
+      - name: Build Rust (dsldesk)
         run: cargo build --release --features flutter
 
-      - name: Apply DSL Desk branding
+      - name: Apply Flutter branding
         working-directory: flutter
         run: |
           # CMakeLists rename
