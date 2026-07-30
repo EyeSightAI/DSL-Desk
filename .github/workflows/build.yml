@@ -1,0 +1,72 @@
+name: Build DSL Desk GUI
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+
+      - name: Setup LLVM
+        run: choco install llvm -y
+
+      - name: Setup vcpkg
+        run: |
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          C:\vcpkg\vcpkg install libvpx libyuv opus aom --triplet x64-windows-static
+
+      - name: Build Rust (dsldesk)
+        env:
+          VCPKG_ROOT: C:\vcpkg
+          LIBCLANG_PATH: "C:\\Program Files\\LLVM\\bin"
+        run: cargo build --release --features flutter
+
+      - name: Apply DSL Desk branding
+        working-directory: flutter
+        run: |
+          # CMakeLists rename
+          (Get-Content windows/CMakeLists.txt -Raw) -replace 'rustdesk', 'dsldesk' | Set-Content windows/CMakeLists.txt
+          (Get-Content windows/CMakeLists.txt -Raw) -replace 'librustdesk.dll', 'libdsldesk.dll' | Set-Content windows/CMakeLists.txt
+          # C++ rename
+          (Get-Content windows/runner/main.cpp -Raw) -replace 'librustdesk.dll', 'libdsldesk.dll' | Set-Content windows/runner/main.cpp
+          # Resource rename
+          (Get-Content windows/runner/Runner.rc -Raw) -replace '"rustdesk"', '"dsldesk"' | Set-Content windows/runner/Runner.rc
+          (Get-Content windows/runner/Runner.rc -Raw) -replace '"rustdesk.exe"', '"dsldesk.exe"' | Set-Content windows/runner/Runner.rc
+          # URI scheme
+          (Get-Content windows/runner/flutter_window.cpp -Raw) -replace 'org.rustdesk.rustdesk', 'org.dsldesk.dsldesk' | Set-Content windows/runner/flutter_window.cpp
+
+      - name: Build Flutter GUI
+        working-directory: flutter
+        run: |
+          flutter pub get
+          flutter build windows
+
+      - name: Collect artifacts
+        run: |
+          mkdir dist
+          Copy-Item flutter/build/windows/x64/runner/Release/* dist/ -Recurse
+          Copy-Item target/release/libdsldesk.dll dist/
+
+      - name: Upload DSL Desk
+        uses: actions/upload-artifact@v4
+        with:
+          name: DSL-Desk-Windows-GUI
+          path: dist/
