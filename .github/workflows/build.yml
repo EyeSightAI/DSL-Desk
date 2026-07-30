@@ -28,10 +28,9 @@ jobs:
 
       - name: Setup vcpkg
         run: |
-          $env:VCPKG_ROOT = "C:\vcpkg"
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git C:\vcpkg
-          C:\vcpkg\bootstrap-vcpkg.bat
-          C:\vcpkg\vcpkg install libvpx libyuv opus aom --triplet x64-windows-static
+          vcpkg install --classic libvpx libyuv opus aom --triplet x64-windows-static
+        env:
+          VCPKG_ROOT: C:\vcpkg
 
       - name: Build Rust (dsldesk)
         env:
